@@ -9,22 +9,72 @@ typedef struct Node {
 // Split the linked list into two parts
 void splitList(Node *head, Node **firstHalf, Node **secondHalf)
 {
-    *firstHalf = head;
-    *secondHalf = head;
-    Node *slow = head;
-    Node *fast = head->next;
-    while (fast && fast->next)
-    {
-        slow = slow->next;
-        fast = fast->next->next;
-    }
-    *secondHalf = slow->next;
-    slow->next = NULL;
-    // asm volatile(
-    //     /*
-    //     Block A (splitList), which splits the linked list into two halves
-    //     */
-    //     "");
+
+    //  *firstHalf = head;
+    asm volatile(
+        "sd %[head], 0(%[firstHalf])       \n\t"    
+        :   [firstHalf] "+r"(firstHalf)
+        :   [head]"r"(head)
+        :   "memory"
+    );
+
+    Node *slow;
+    // Node *slow = head;
+    Node *fast;
+    // Node *fast = head->next;
+
+    asm volatile(
+        "mv %[slow], %[head]     \n\t"    // slow = head;
+        //////////
+        "lw t0, 8(%[head])      \n\t"
+        "mv %[fast], t0     \n\t" 
+
+        :   [slow] "+r"(slow), [fast] "+r"(fast)
+        :   [head] "r"(head)
+        :   "memory"
+    );
+
+    // while (fast && fast->next)
+    // {
+    //     slow = slow->next;
+    //     fast = fast->next->next;
+    // }
+    asm volatile(
+        "while:     \n\t"
+        "beqz %[fast], end     \n\t"
+
+        // 以下段落
+        // "lw t5, 8(%[fast])          \n\t"
+        // "beqz t5, end     \n\t"
+        // "ld %[slow], 8(%[slow]) \n\t"
+        // "ld %[fast], 8(%[fast]) \n\t"
+        // "ld %[fast], 8(%[fast]) \n\t"
+        // 相當於
+        "ld t0, 8(%[fast])               \n\t"  // t0 = fast->next
+        "beqz t0, end               \n\t"  // if (fast->next == NULL) 跳出迴圈
+        "ld %[slow], 8(%[slow])          \n\t"  // slow = slow->next
+        "ld %[fast], 8(t0)               \n\t"  // fast = fast->next->next
+        // \\ //
+
+
+        "j while        \n\t"
+        "end:                \n\t"
+        :   [slow] "+r"(slow), [fast] "+r"(fast)
+        :
+        :   "memory"
+    );
+
+    // *secondHalf = slow->next;
+    // slow->next = NULL;
+    asm volatile(
+        "lw t2, 8(%[slow])      \n\t"
+        "sd t2, 0(%[secondHalf])\n\t"
+        //////////
+        "sd zero, 8(%[slow])    \n\t"// cant sw因為只會存4 word。sw存入double word共64bit為8 word。
+        :   [secondHalf] "+r"(secondHalf)
+        :   [slow] "r"(slow)
+        :   "memory"
+    );
 }
 
 // Merge two sorted linked lists
@@ -32,6 +82,7 @@ Node *mergeSortedLists(Node *a, Node *b)
 {
     Node *result = NULL;
     Node *tail = NULL;
+
 
     if (a->data < b->data) {
         result = a;
@@ -65,11 +116,11 @@ Node *mergeSortedLists(Node *a, Node *b)
     if (b) {
         tail->next = b;
     }
-    // asm volatile(
-    //     /*
-    //     Block B (mergeSortedList), which merges two sorted lists into one
-    //     */
-    //     "");
+    asm volatile(
+        /*
+        Block B (mergeSortedList), which merges two sorted lists into one
+        */
+        "");
 
     return result;
 }
@@ -81,7 +132,8 @@ Node *mergeSort(Node *head)
         return head; // Return directly if there is only one node
 
     Node *firstHalf, *secondHalf;
-    splitList(head, &firstHalf,&secondHalf); // Split the list into two sublists
+    splitList(head, &firstHalf,
+              &secondHalf); // Split the list into two sublists
 
     firstHalf = mergeSort(firstHalf);   // Recursively sort the left half
     secondHalf = mergeSort(secondHalf); // Recursively sort the right half
@@ -117,16 +169,34 @@ int main(int argc, char *argv[])
     head = mergeSort(head);
 
     cur = head;
+
+    Node* anss=cur;
+    Node* ans2=cur;
     while (cur) {
         printf("%d ", cur->data);
-        cur = cur -> next;
-        // asm volatile(
-        //     /*
-        //     Block C (Move to the next node), which updates the pointer to
-        //     traverse the linked list
-        //     */
-        //     "");
+        // printf("%d %p   %p\n", (cur->data),&(cur->data), cur);
+        // // printf("%d,  %p\n",anss->data,anss);
+        // printf("%p\n",ans2);
+        // printf("\n");
+
+        asm volatile(
+            // "mv t1, %[cur]          \n\t"
+
+            // "lw t0, 8(%[cur])       \n\t"       // 利用lw將存在cur指標位置的變數取出，offset為8為成員next，即下一個節點的位置
+            // // "lw t0, 0(t0)       \n\t"
+            // "mv %[anss], t0         \n\t"
+            // "mv %[ans2], t1         \n\t"
+            // "mv %[cur], t0         \n\t"        // 既然下一個節點的位置存在t0，將其賦給到cur。
+
+            "ld %[cur], 8(%[cur])   \n\t"
+            : [cur] "+r" (cur), [anss]"+r"(anss), [ans2]"+r"(ans2)
+            : 
+            : "memory"
+        );
+        
     }
+    // printf("SIZE: %d %d %d",sizeof(Node),sizeof(Node*),sizeof(int));
+    
     printf("\n");
     return 0;
 }

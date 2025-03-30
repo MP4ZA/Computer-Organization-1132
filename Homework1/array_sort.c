@@ -29,7 +29,7 @@ int main(int argc, char *argv[])
     // array a bubble sort
     /* Original C code segment
     for (int i = 0; i < arr_size - 1; i++) {
-        for (int j = 0; j < arr_size - i - 1; j++) {
+        for (int j = 0; j < arr_size - i -1; j++) {
             if (*(p_a + j) > *(p_a + j + 1)) {
                 int tmp = *(p_a + j);
                 *(p_a + j) = *(p_a + j + 1);
@@ -42,22 +42,21 @@ int main(int argc, char *argv[])
     for (int i = 0; i < arr_size - 1; i++) {
         for (int j = 0; j < arr_size - i - 1; j++) {
             asm volatile(
-                "slli %[J], %[J], 2 \n\t"
-                "add t0, %[A], %[J]    \n\t"
-                "lw s1, 0(t0)         \n\t"
+                "slli %[J], %[J], 2     \n\t"
+                "add t0, %[A], %[J]     \n\t"
+                "lw s1, 0(t0)           \n\t"
                 "addi t1, t0, 4         \n\t"
                 "lw s2, 0(t1)           \n\t"
                 "bge s2, s1, end        \n\t"     
-                "sw s1, 0(t1)            \n\t"
-                "sw s2, 0(t0)            \n\t"
-            "end:                       \n\t"
+                "sw s1, 0(t1)           \n\t"
+                "sw s2, 0(t0)           \n\t"
+                "end:                   \n\t"
                 : 
                 : [A] "r"(p_a), [J] "r"(j)
                 : "memory", "s1", "s2", "t0", "t1", "t2", "s3", "s4"
-            );
+            );            
         }
     }
-
     p_a = &arr[0];
     for (int i = 0; i < arr_size; i++)
         printf("%d ", *p_a++);
