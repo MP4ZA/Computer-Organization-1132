@@ -19,7 +19,7 @@ void splitList(Node *head, Node **firstHalf, Node **secondHalf)
         //     slow = slow->next;
         //     fast = fast->next->next;
         // }
-        // "while:     \n\t"    // <<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<WTF
+        "while:     \n\t"    // <<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<WTF
         "beqz s2, end     \n\t"
         // 以下段落
         // "lw t5, 8(s2)          \n\t"
@@ -33,7 +33,7 @@ void splitList(Node *head, Node **firstHalf, Node **secondHalf)
         "ld s1, 8(s1)          \n\t"  // slow = slow->next
         "ld s2, 8(t0)               \n\t"  // fast = fast->next->next
         // \\ //
-        // "j while        \n\t"    // <<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<WTF
+        "j while        \n\t"    // <<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<WTF
         "end:                \n\t"
 
         "lw t2, 8(s1)      \n\t"   // *secondHalf = slow->next;
@@ -54,45 +54,79 @@ Node *mergeSortedLists(Node *a, Node *b)
     Node *result = NULL;
     Node *tail = NULL;
 
+    // ===========================================
+    // if (a->data < b->data) {
+    //     result = a;
+    //     tail = a;
+    //     a = a->next;
+    // } else {
+    //     result = b;
+    //     tail = b;
+    //     b = b->next;
+    // }
 
-    if (a->data < b->data) {
-        result = a;
-        tail = a; // tail 指向a，因為 result 指向 a
-        a = a->next; // 讓a向後移動
-    } else {
-        result = b;
-        tail = b; // tail 指向b，因為 result 指向 b
-        b = b->next; // 讓b向後移動
-    }
-
-    // 合併剩餘的節點
-    while (a && b) {
-        if (a->data < b->data) {
-            tail->next = a;
-            tail = a;  // 更新tail為a
-            a = a->next; // 讓a向後移動
-        } else {
-            tail->next = b;
-            tail = b;  // 更新tail為b
-            b = b->next; // 讓b向後移動
-        }
-    }
-
-    // 如果a還有剩餘節點
-    if (a) {
-        tail->next = a;
-    }
-
-    // 如果b還有剩餘節點
-    if (b) {
-        tail->next = b;
-    }
     asm volatile(
-        /*
-        Block B (mergeSortedList), which merges two sorted lists into one
-        */
-        "");
+        "lw t3, 0(%[a])         \n\t"       // a->data
+        "lw t4, 0(%[b])         \n\t"       // b->data
+        "bge t3, t4, elsebge0   \n\t"       // if
+        "mv %[result], %[a]     \n\t"       // result = a;
+        "mv %[tail], %[a]       \n\t"       // tail = a;
+        "ld %[a], 8(%[a])       \n\t"       // a = a->next;
+        "j end0                 \n\t"
+        "elsebge0:              \n\t"       // else
+        "mv %[result], %[b]     \n\t"       // result = b;
+        "mv %[tail], %[b]       \n\t"       // tail = b;
+        "ld %[b], 8(%[b])       \n\t"       // b = b->next;
+        "end0:                  \n\t"
 
+
+        // while (a && b) {
+        //     if (a->data < b->data) {
+        //         tail->next = a;
+        //         tail = a;
+        //         a = a->next;
+        //     } else {
+        //         tail->next = b;
+        //         tail = b;
+        //         b = b->next;
+        //     }
+        // }
+        "whileM:                \n\t"
+        "beqz %[a], endwhile    \n\t"
+        "beqz %[b], endwhile    \n\t"
+
+        "lw t3, 0(%[a])         \n\t"       // a->data
+        "lw t4, 0(%[b])         \n\t"       // b->data
+        "bge t3, t4, elsebge    \n\t"       // if
+        "sd %[a], 8(%[tail])    \n\t"       // tail->next = a;
+        "mv %[tail], %[a]       \n\t"       // tail = a;
+        "ld %[a], 8(%[a])       \n\t"       // a = a->next;
+        "j goback               \n\t"
+        "elsebge:               \n\t"       // else
+        "sd %[b], 8(%[tail])    \n\t"       // tail->next = b;
+        "mv %[tail], %[b]       \n\t"       // tail = b;
+        "ld %[b], 8(%[b])       \n\t"       // b = b->next;
+        "goback:                \n\t"
+
+        "j whileM               \n\t"
+        "endwhile:              \n\t"
+
+        // if (a) {
+        //     tail->next = a;
+        // }
+        // if (b) {
+        //     tail->next = b;
+        // }
+        "beqz %[a], ifB         \n\t"
+        "sd %[a], 8(%[tail])    \n\t"
+        "ifB:                   \n\t"
+        "beqz %[b], endif         \n\t"
+        "sd %[b], 8(%[tail])    \n\t"
+        "endif:                  \n\t"
+        :   [result]"+r"(result), [tail]"+r"(tail), [a]"+r"(a), [b]"+r"(b)
+        :   
+        :   "memory"
+    );
     return result;
 }
 
