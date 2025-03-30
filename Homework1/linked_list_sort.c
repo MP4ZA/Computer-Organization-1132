@@ -9,71 +9,42 @@ typedef struct Node {
 // Split the linked list into two parts
 void splitList(Node *head, Node **firstHalf, Node **secondHalf)
 {
-
-    //  *firstHalf = head;
     asm volatile(
-        "sd %[head], 0(%[firstHalf])       \n\t"    
-        :   [firstHalf] "+r"(firstHalf)
-        :   [head]"r"(head)
-        :   "memory"
-    );
+        "sd %[head], 0(%[firstHalf])    \n\t"   //  *firstHalf = head;
+        "mv s1, %[head]            \n\t"   // Node *slow = head;
+        "lw t0, 8(%[head])              \n\t"   // Node *fast = head->next;
+        "mv s2, t0                 \n\t" 
 
-    Node *slow;
-    // Node *slow = head;
-    Node *fast;
-    // Node *fast = head->next;
-
-    asm volatile(
-        "mv %[slow], %[head]     \n\t"    // slow = head;
-        //////////
-        "lw t0, 8(%[head])      \n\t"
-        "mv %[fast], t0     \n\t" 
-
-        :   [slow] "+r"(slow), [fast] "+r"(fast)
-        :   [head] "r"(head)
-        :   "memory"
-    );
-
-    // while (fast && fast->next)
-    // {
-    //     slow = slow->next;
-    //     fast = fast->next->next;
-    // }
-    asm volatile(
-        "while:     \n\t"
-        "beqz %[fast], end     \n\t"
-
+        // while (fast && fast->next){
+        //     slow = slow->next;
+        //     fast = fast->next->next;
+        // }
+        // "while:     \n\t"    // <<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<WTF
+        "beqz s2, end     \n\t"
         // 以下段落
-        // "lw t5, 8(%[fast])          \n\t"
+        // "lw t5, 8(s2)          \n\t"
         // "beqz t5, end     \n\t"
-        // "ld %[slow], 8(%[slow]) \n\t"
-        // "ld %[fast], 8(%[fast]) \n\t"
-        // "ld %[fast], 8(%[fast]) \n\t"
+        // "ld s1, 8(s1) \n\t"
+        // "ld s2, 8(s2) \n\t"
+        // "ld s2, 8(s2) \n\t"
         // 相當於
-        "ld t0, 8(%[fast])               \n\t"  // t0 = fast->next
+        "ld t0, 8(s2)               \n\t"  // t0 = fast->next
         "beqz t0, end               \n\t"  // if (fast->next == NULL) 跳出迴圈
-        "ld %[slow], 8(%[slow])          \n\t"  // slow = slow->next
-        "ld %[fast], 8(t0)               \n\t"  // fast = fast->next->next
+        "ld s1, 8(s1)          \n\t"  // slow = slow->next
+        "ld s2, 8(t0)               \n\t"  // fast = fast->next->next
         // \\ //
-
-
-        "j while        \n\t"
+        // "j while        \n\t"    // <<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<WTF
         "end:                \n\t"
-        :   [slow] "+r"(slow), [fast] "+r"(fast)
-        :
-        :   "memory"
-    );
 
-    // *secondHalf = slow->next;
-    // slow->next = NULL;
-    asm volatile(
-        "lw t2, 8(%[slow])      \n\t"
+        "lw t2, 8(s1)      \n\t"   // *secondHalf = slow->next;
         "sd t2, 0(%[secondHalf])\n\t"
-        //////////
-        "sd zero, 8(%[slow])    \n\t"// cant sw因為只會存4 word。sw存入double word共64bit為8 word。
-        :   [secondHalf] "+r"(secondHalf)
-        :   [slow] "r"(slow)
-        :   "memory"
+        "sd zero, 8(s1)    \n\t"   // slow->next = NULL;   // cant sw因為只會存4 word。sw存入double word共64bit為8 word。
+
+        :   [firstHalf] "+r"(firstHalf), [secondHalf] "+r"(secondHalf)
+        :   [head]"r"(head)
+        :   "memory", "s1", "s2"
+        // s1: slow
+        // s2: fast    
     );
 }
 
